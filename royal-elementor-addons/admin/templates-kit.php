@@ -304,6 +304,7 @@ function wpr_fix_royal_compatibility() {
         'royal-elementor-addons/wpr-addons.php',
         'royal-elementor-addons-pro/wpr-addons-pro.php',
         'wpr-addons-pro/wpr-addons-pro.php',
+        'royal-backup-reset/royal-backup-reset.php',
         'contact-form-7/wp-contact-form-7.php',
         'woocommerce/woocommerce.php',
         'really-simple-ssl/rlrsssl-really-simple-ssl.php',
@@ -432,6 +433,9 @@ function wpr_import_templates_kit() {
 
         // Prepare for Import
         $wp_import = new WP_Import( $local_file_path, ['fetch_attachments' => true] );
+
+        // Pre Register Custom Post Types
+        wpr_register_cpt_before_import( $kit );
 
         // Import
         ob_start();
@@ -662,7 +666,6 @@ function wpr_reset_previous_import() {
 function import_elementor_site_settings( $kit ) {
     // Avoid Cache
     // $randomNum = substr(str_shuffle("0123456789abcdefghijklmnopqrstvwxyzABCDEFGHIJKLMNOPQRSTVWXYZ"), 0, 7);
-
     update_option('elementor_experiment-e_local_google_fonts', 'inactive');
 
     // Get Remote File
@@ -830,6 +833,44 @@ function setup_wpr_templates( $kit ) {
         update_option('wpr_popup_conditions', '{"user-popup-'. $kit .'-off-canvas":["global"],"user-popup-'. $kit .'-popup":["global"]}');
     } else {
         update_option('wpr_popup_conditions', '{"user-popup-'. $kit .'-popup":["global"]}');
+    }
+}
+
+
+/**
+** Register Custom Post Types
+*/
+function wpr_register_cpt_before_import( $kit ) {
+    $kit_name = substr($kit, 0, strripos($kit, '-v'));
+    $kit_version = substr($kit, (strripos($kit, '-v') + 1), strlen($kit));
+    $get_available_kits = WPR_Templates_Data::get_available_kits();
+    $get_custom_types = $get_available_kits[$kit_name][$kit_version]['custom-types'];
+
+    // Custom Post Types & Taxonomies
+    if ( isset($get_custom_types) && wpr_fs()->is_plan( 'expert' ) ) {
+        $index = 0;
+        $cpt_slug = '';
+
+        foreach ($get_custom_types as $label => $slug) {
+            // Register custom post type
+            if ( 0 === $index ) {
+                $cpt_slug = $slug;
+                register_post_type($slug, array(
+                    'public' => true,
+                    'has_archive' => true,
+                    'show_in_nav_menus' => true,
+                    'supports' => array('title', 'editor', 'thumbnail')
+                ));
+            } else {
+                register_taxonomy($slug, $cpt_slug, array(
+                    'public' => true,
+                    'show_in_nav_menus' => true,
+                    'hierarchical' => true
+                ));
+            }
+            
+            $index++;
+        }
     }
 }
 
